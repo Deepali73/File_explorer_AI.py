@@ -18,15 +18,22 @@ def speak(text):
 def listen_command():
     r = sr.Recognizer()
     with sr.Microphone() as source:
-        speak("Listening...")
+        speak("Listening for your command.")
+        st.info("🎙️ Listening... Please speak now.")
+        r.adjust_for_ambient_noise(source)
         audio = r.listen(source)
-        try:
-            command = r.recognize_google(audio)
-            return command.lower()
-        except sr.UnknownValueError:
-            return "Could not understand"
-        except sr.RequestError:
-            return "API unavailable"
+    try:
+        command = r.recognize_google(audio)
+        st.success(f"🗣️ You said: {command}")
+        return command.lower()
+    except sr.UnknownValueError:
+        speak("Sorry, I could not understand your command.")
+        st.error("Could not understand. Please try again.")
+        return ""
+    except sr.RequestError:
+        speak("Speech recognition service is unavailable.")
+        st.error("Recognition service error.")
+        return ""
 
 # =================== File Management Functions ==================
 def list_files_sorted(folder):
@@ -65,7 +72,7 @@ def create_dir(folder_name, directory):
 # ======================= Streamlit UI Setup ========================
 st.set_page_config("📁 Fiorer", layout="centered")
 st.markdown("<h1 style='color:#7B68EE;'>📁 Fiorer</h1>", unsafe_allow_html=True)
-st.markdown("#### new version file management explorer system")
+st.markdown("#### A smarter voice-enabled file management explorer")
 
 default_directory = os.getcwd()
 if "history" not in st.session_state:
@@ -84,12 +91,17 @@ mode = st.sidebar.selectbox("Choose Input Mode", ["Voice Command", "API Command"
 
 # ====================== VOICE COMMAND MODE ======================
 if mode == "Voice Command":
-    if st.button("🎙️ Start Voice Command"):
+    if st.button("🎤 Speak Command"):
         command = listen_command()
-        st.success(f"🎧 You said: `{command}`")
+        if not command:
+            st.stop()
+
         st.session_state.history.append(f"Voice: {command}")
 
-        if "list" in command:
+        # Normalize voice command
+        command = command.lower().strip()
+
+        if any(kw in command for kw in ["list", "show", "display", "see files", "all files", "contents"]):
             files = list_files_sorted(default_directory)
             if isinstance(files, str):
                 st.error(files)
@@ -101,14 +113,26 @@ if mode == "Voice Command":
                     st.markdown(f"`{f}` | `{ext}` | `{size}`")
                 st.toast("📄 File listing complete!")
 
+        elif any(kw in command for kw in ["rename", "change name", "modify name", "update name"]):
+            speak("Sorry, rename via voice is not yet supported. Use API tab.")
+            st.warning("⚠️ Rename not supported in voice mode.")
+
+        elif any(kw in command for kw in ["delete", "remove", "erase", "trash", "clear file", "clear folder"]):
+            speak("Sorry, delete via voice is not yet supported. Use API tab.")
+            st.warning("⚠️ Delete not supported in voice mode.")
+
+        elif any(kw in command for kw in ["create", "make folder", "new folder", "add folder", "mkdir"]):
+            speak("Sorry, folder creation via voice is not yet supported. Use API tab.")
+            st.warning("⚠️ Folder creation not supported in voice mode.")
+
         else:
-            st.warning("Try saying: list files / delete file / rename file / create folder")
+            speak("That command is not available right now.")
+            st.warning("❌ Unrecognized command. Try: show files, delete file, rename file, or make folder.")
 
 # ======================= API COMMAND MODE =========================
 elif mode == "API Command":
     st.subheader("🔧 Select Operation")
     command = st.selectbox("Choose Command", ["list", "rename", "delete", "create"])
-
     directory = st.text_input("📂 Enter folder path", value=default_directory)
 
     if command == "list":
@@ -164,4 +188,4 @@ elif mode == "API Command":
 
 # ========================== Footer =============================
 st.markdown("---")
-st.info("⚙️ Fiorer: Your modern file management system with voice & API.")
+st.info("⚙️ Fiorer: A smart file explorer using voice & API. Say commands like 'show files' or use the API tab.")
